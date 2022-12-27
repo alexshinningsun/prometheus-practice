@@ -67,7 +67,7 @@ configmapReload:
 server:
   ## Prometheus server container name
   ##
-  name: server
+  name: testing
 
   ## Use a ClusterRole (and ClusterRoleBinding)
   ## - If set to false - we define a RoleBinding in the defined namespaces ONLY
@@ -80,8 +80,9 @@ server:
   # useExistingClusterRoleName: nameofclusterrole
 
   ## namespaces to monitor (instead of monitoring all - clusterwide). Needed if you want to run without Cluster-admin privileges.
-  # namespaces:
-  #   - yournamespace
+  namespaces:
+    - web
+    - db 
 
   # sidecarContainers - add more containers to prometheus server
   # Key/Value where Key is the sidecar `- name: <Key>`
