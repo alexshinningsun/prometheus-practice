@@ -1,2 +1,4 @@
 # prometheus-practice
-a practice for using helm-prometheus
+This is a practice for using helm-prometheus.
+
+The First practice is referencing 
