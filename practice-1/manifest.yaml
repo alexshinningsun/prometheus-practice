@@ -108,10 +108,21 @@ metadata:
   namespace: default
 data:
   allow-snippet-annotations: "false"
-  alerting_rules.yml: |
-    {}
   alerts: |
     {}
+  groups: |
+    - name: k8s-pods.rules
+      rules:
+      - alert: AppPodStatusTerminated
+        annotations:
+          description: '{{ $labels.instance }} of job {{ $labels.job }} has been down
+            for more than 3 minutes.'
+          summary: Instance {{ $labels.instance }} down
+        expr: |
+          kube_pod_container_status_terminated{job="kube-state-metrics", namespace="app", pod=~"app.*"} > 1
+        for: 3m
+        labels:
+          severity: critical
   prometheus.yml: |
     global:
       evaluation_interval: 1m
