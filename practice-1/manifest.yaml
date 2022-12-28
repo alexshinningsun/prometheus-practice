@@ -60,12 +60,12 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    component: "server"
+    component: "testing"
     app: prometheus
     release: monitoring
     chart: prometheus-19.2.1
     heritage: Helm
-  name: monitoring-prometheus-server
+  name: monitoring-prometheus-testing
   namespace: default
   annotations:
     {}
@@ -99,19 +99,30 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   labels:
-    component: "server"
+    component: "testing"
     app: prometheus
     release: monitoring
     chart: prometheus-19.2.1
     heritage: Helm
-  name: monitoring-prometheus-server
+  name: monitoring-prometheus-testing
   namespace: default
 data:
   allow-snippet-annotations: "false"
-  alerting_rules.yml: |
-    {}
   alerts: |
     {}
+  groups: |
+    - name: k8s-pods.rules
+      rules:
+      - alert: AppPodStatusTerminated
+        annotations:
+          description: '{{ $labels.instance }} of job {{ $labels.job }} has been down
+            for more than 3 minutes.'
+          summary: Instance {{ $labels.instance }} down
+        expr: |
+          kube_pod_container_status_terminated{job="kube-state-metrics", namespace="app", pod=~"app.*"} > 1
+        for: 3m
+        labels:
+          severity: critical
   prometheus.yml: |
     global:
       evaluation_interval: 1m
@@ -430,12 +441,12 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   labels:
-    component: "server"
+    component: "testing"
     app: prometheus
     release: monitoring
     chart: prometheus-19.2.1
     heritage: Helm
-  name: monitoring-prometheus-server
+  name: monitoring-prometheus-testing
   namespace: default
 spec:
   accessModes:
@@ -604,12 +615,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    component: "server"
+    component: "testing"
     app: prometheus
     release: monitoring
     chart: prometheus-19.2.1
     heritage: Helm
-  name: monitoring-prometheus-server
+  name: monitoring-prometheus-testing
 rules:
   - apiGroups:
       - ""
@@ -662,26 +673,6 @@ subjects:
 - kind: ServiceAccount
   name: monitoring-kube-state-metrics
   namespace: default
----
-# Source: prometheus/templates/clusterrolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: monitoring
-    chart: prometheus-19.2.1
-    heritage: Helm
-  name: monitoring-prometheus-server
-subjects:
-  - kind: ServiceAccount
-    name: monitoring-prometheus-server
-    namespace: default
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: monitoring-prometheus-server
 ---
 # Source: prometheus/charts/alertmanager/templates/services.yaml
 apiVersion: v1
@@ -811,12 +802,12 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    component: "server"
+    component: "testing"
     app: prometheus
     release: monitoring
     chart: prometheus-19.2.1
     heritage: Helm
-  name: monitoring-prometheus-server
+  name: monitoring-prometheus-testing
   namespace: default
 spec:
   ports:
@@ -825,7 +816,7 @@ spec:
       protocol: TCP
       targetPort: 9090
   selector:
-    component: "server"
+    component: "testing"
     app: prometheus
     release: monitoring
   sessionAffinity: None
@@ -1067,17 +1058,17 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    component: "server"
+    component: "testing"
     app: prometheus
     release: monitoring
     chart: prometheus-19.2.1
     heritage: Helm
-  name: monitoring-prometheus-server
+  name: monitoring-prometheus-testing
   namespace: default
 spec:
   selector:
     matchLabels:
-      component: "server"
+      component: "testing"
       app: prometheus
       release: monitoring
   replicas: 1
@@ -1087,16 +1078,16 @@ spec:
   template:
     metadata:
       labels:
-        component: "server"
+        component: "testing"
         app: prometheus
         release: monitoring
         chart: prometheus-19.2.1
         heritage: Helm
     spec:
       enableServiceLinks: true
-      serviceAccountName: monitoring-prometheus-server
+      serviceAccountName: monitoring-prometheus-testing
       containers:
-        - name: prometheus-server-configmap-reload
+        - name: prometheus-testing-configmap-reload
           image: "jimmidyson/configmap-reload:v0.8.0"
           imagePullPolicy: "IfNotPresent"
           args:
@@ -1109,11 +1100,11 @@ spec:
               mountPath: /etc/config
               readOnly: true
 
-        - name: prometheus-server
+        - name: prometheus-testing
           image: "quay.io/prometheus/prometheus:v2.41.0"
           imagePullPolicy: "IfNotPresent"
           args:
-            - --storage.tsdb.retention.time=15d
+            - --storage.tsdb.retention.time=30d
             - --config.file=/etc/config/prometheus.yml
             - --storage.tsdb.path=/data
             - --web.console.libraries=/etc/prometheus/console_libraries
@@ -1142,7 +1133,12 @@ spec:
             failureThreshold: 3
             successThreshold: 1
           resources:
-            {}
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 500m
+              memory: 512Mi
           volumeMounts:
             - name: config-volume
               mountPath: /etc/config
@@ -1150,6 +1146,8 @@ spec:
               mountPath: /data
               subPath: ""
       dnsPolicy: ClusterFirst
+      nodeSelector:
+        group: main
       securityContext:
         fsGroup: 65534
         runAsGroup: 65534
@@ -1159,10 +1157,10 @@ spec:
       volumes:
         - name: config-volume
           configMap:
-            name: monitoring-prometheus-server
+            name: monitoring-prometheus-testing
         - name: storage-volume
           persistentVolumeClaim:
-            claimName: monitoring-prometheus-server
+            claimName: monitoring-prometheus-testing
 ---
 # Source: prometheus/charts/alertmanager/templates/statefulset.yaml
 apiVersion: apps/v1
